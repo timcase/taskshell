@@ -121,6 +121,30 @@ static void deleteTask (const std::string& uuid)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+static void scheduleToday (const std::string& uuid)
+{
+  std::string command = "task rc.confirmation:no rc.verbose:nothing " + uuid + " mod due:today";
+  system (command.c_str ());
+  std::cout << "Scheduled for today.\n\n\n\n";
+}
+
+////////////////////////////////////////////////////////////////////////////////
+static void scheduleThisweek (const std::string& uuid)
+{
+  std::string command = "task rc.confirmation:no rc.verbose:nothing " + uuid + " mod +thisweek";
+  system (command.c_str ());
+  std::cout << "Scheduled for thisweek.\n\n\n\n";
+}
+
+////////////////////////////////////////////////////////////////////////////////
+static void unscheduleTask (const std::string& uuid)
+{
+  std::string command = "task rc.confirmation:no rc.verbose:nothing " + uuid + " mod due:";
+  system (command.c_str ());
+  std::cout << "Unscheduled.\n\n\n\n";
+}
+
+////////////////////////////////////////////////////////////////////////////////
 static const std::string reviewNothing ()
 {
   return "\nThere are no tasks needing review.\n\n";
@@ -181,7 +205,7 @@ static const std::string banner (
 ////////////////////////////////////////////////////////////////////////////////
 static const std::string menu ()
 {
-  return Color ("color15 on gray6").colorize (" (Enter) Mark as reviewed, (s)kip, (e)dit, (m)odify, (c)omplete, (d)elete, (q)uit ") + " ";
+  return Color ("color15 on gray6").colorize (" (Enter) Mark as reviewed, go (b)ack a task, (s)kip, (e)dit, (m)odify, (t)oday, this(w)eek, (u)nschedule, (c)omplete, (d)elete, (q)uit ") + " ";
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -236,7 +260,11 @@ static void reviewLoop (const std::vector <std::string>& uuids, unsigned int lim
            if (response == "e") { editTask (uuid);                                   }
       else if (response == "m") { modifyTask (uuid);          repeat = true;         }
       else if (response == "s") { std::cout << "Skipped\n\n"; ++current;             }
+      else if (response == "b") { std::cout << "Back\n\n";    --current; --reviewed; }
       else if (response == "c") { completeTask (uuid);        ++current; ++reviewed; }
+      else if (response == "t") { scheduleToday (uuid);       ++current; ++reviewed; }
+      else if (response == "w") { scheduleThisweek (uuid);    ++current; ++reviewed; }
+      else if (response == "u") { unscheduleTask (uuid);      ++current; ++reviewed; }
       else if (response == "d") { deleteTask (uuid);          ++current; ++reviewed; }
       else if (response == "")  { reviewTask (uuid);          ++current; ++reviewed; }
       else if (response == "r") { reviewTask (uuid);          ++current; ++reviewed; }
@@ -308,6 +336,112 @@ int cmdReview (const std::vector <std::string>& args, bool autoClear)
                       "rc._forcecolor=off",
                       "rc.verbose=nothing",
                       "_reviewed"
+                    },
+                    input, output);
+
+  // Review the set of UUIDs.
+  auto uuids = split (Lexer::trimRight (output, "\n"), '\n');
+  reviewLoop (uuids, limit, autoClear);
+  return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+int cmdToday (const std::vector <std::string>& args, bool autoClear)
+{
+  // Is there a specified limit?
+  unsigned int limit = 0;
+  if (args.size () == 2)
+    limit = strtol (args[1].c_str (), NULL, 10);
+
+  // Configure 'reviewed' UDA, but only if necessary.
+  std::string input;
+  std::string output;
+  auto status = execute ("task", {"_get", "rc.uda.reviewed.type"}, input, output);
+  if (status || output != "date\n")
+  {
+    if (confirm ("Tasksh needs to define a 'reviewed' UDA of type 'date' for all tasks.  Ok to proceed?"))
+    {
+      execute ("task", {"rc.confirmation:no", "rc.verbose:nothing", "config", "uda.reviewed.type",  "date"},     input, output);
+      execute ("task", {"rc.confirmation:no", "rc.verbose:nothing", "config", "uda.reviewed.label", "Reviewed"}, input, output);
+    }
+  }
+
+  // Configure '_today' report, but only if necessary.
+  status = execute ("task", {"_get", "rc.report._today.columns"}, input, output);
+  if (status || output != "uuid\n")
+  {
+    if (confirm ("Tasksh needs to define a '_today' report to identify tasks needing review.  Ok to proceed?"))
+    {
+      execute ("task", {"rc.confirmation:no", "rc.verbose:nothing", "config", "report._today.description",
+                        "Tasksh review report.  Adjust the filter to your needs."                                              }, input, output);
+      execute ("task", {"rc.confirmation:no", "rc.verbose:nothing", "config", "report._today.columns", "uuid"               }, input, output);
+      execute ("task", {"rc.confirmation:no", "rc.verbose:nothing", "config", "report._today.sort",    "reviewed+,modified+"}, input, output);
+      execute ("task", {"rc.confirmation:no", "rc.verbose:nothing", "config", "report._today.filter",
+                        "( +thisweek or +next ) and ( +PENDING or +WAITING )"                         }, input, output);
+    }
+  }
+
+  // Obtain a list of UUIDs to review.
+  status = execute ("task",
+                    {
+                      "rc.color=off",
+                      "rc.detection=off",
+                      "rc._forcecolor=off",
+                      "rc.verbose=nothing",
+                      "_today"
+                    },
+                    input, output);
+
+  // Review the set of UUIDs.
+  auto uuids = split (Lexer::trimRight (output, "\n"), '\n');
+  reviewLoop (uuids, limit, autoClear);
+  return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+int cmdThisweek (const std::vector <std::string>& args, bool autoClear)
+{
+  // Is there a specified limit?
+  unsigned int limit = 0;
+  if (args.size () == 2)
+    limit = strtol (args[1].c_str (), NULL, 10);
+
+  // Configure 'reviewed' UDA, but only if necessary.
+  std::string input;
+  std::string output;
+  auto status = execute ("task", {"_get", "rc.uda.reviewed.type"}, input, output);
+  if (status || output != "date\n")
+  {
+    if (confirm ("Tasksh needs to define a 'reviewed' UDA of type 'date' for all tasks.  Ok to proceed?"))
+    {
+      execute ("task", {"rc.confirmation:no", "rc.verbose:nothing", "config", "uda.reviewed.type",  "date"},     input, output);
+      execute ("task", {"rc.confirmation:no", "rc.verbose:nothing", "config", "uda.reviewed.label", "Reviewed"}, input, output);
+    }
+  }
+
+  // Configure '_thisweek' report, but only if necessary.
+  status = execute ("task", {"_get", "rc.report._thisweek.columns"}, input, output);
+  if (status || output != "uuid\n")
+  {
+    if (confirm ("Tasksh needs to define a '_thisweek' report to identify tasks needing review.  Ok to proceed?"))
+    {
+      execute ("task", {"rc.confirmation:no", "rc.verbose:nothing", "config", "report._thisweek.description",
+                        "Tasksh review report.  Adjust the filter to your needs."                                              }, input, output);
+      execute ("task", {"rc.confirmation:no", "rc.verbose:nothing", "config", "report._thisweek.columns", "uuid"               }, input, output);
+      execute ("task", {"rc.confirmation:no", "rc.verbose:nothing", "config", "report._thisweek.sort",    "reviewed+,modified+"}, input, output);
+      execute ("task", {"rc.confirmation:no", "rc.verbose:nothing", "config", "report._thisweek.filter",
+                        "( +thisweek or +next ) and ( +PENDING or +WAITING )"                         }, input, output);
+    }
+  }
+
+  // Obtain a list of UUIDs to review.
+  status = execute ("task",
+                    {
+                      "rc.color=off",
+                      "rc.detection=off",
+                      "rc._forcecolor=off",
+                      "rc.verbose=nothing",
+                      "_thisweek"
                     },
                     input, output);
 

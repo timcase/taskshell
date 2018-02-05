@@ -47,6 +47,8 @@
 int cmdHelp ();
 int cmdDiagnostics ();
 int cmdReview (const std::vector <std::string>&, bool);
+int cmdToday (const std::vector <std::string>&, bool);
+int cmdThisweek (const std::vector <std::string>&, bool);
 int cmdShell (const std::vector <std::string>&);
 std::string promptCompose ();
 std::string findTaskwarrior ();
@@ -122,6 +124,8 @@ static int commandLoop (bool autoClear)
     else if (closeEnough ("help",        args[0], 3)) status = cmdHelp ();
     else if (closeEnough ("diagnostics", args[0], 3)) status = cmdDiagnostics ();
     else if (closeEnough ("review",      args[0], 3)) status = cmdReview (args, autoClear);
+    else if (closeEnough ("today",       args[0], 3)) status = cmdToday (args, autoClear);
+    else if (closeEnough ("thisweek",    args[0], 3)) status = cmdThisweek (args, autoClear);
     else if (closeEnough ("exec",        args[0], 3) ||
              args[0][0] == '!')                       status = cmdShell (args);
     else if (command != "")

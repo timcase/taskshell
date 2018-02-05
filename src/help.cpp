@@ -34,6 +34,8 @@ int cmdHelp ()
             << "  Commands:\n"
             << "    tasksh> list             Or any other Taskwarrior command\n"
             << "    tasksh> review [N]       Task review session, with optional cutoff after N tasks\n"
+            << "    tasksh> today [N]        Schedule for today session, with optional cutoff after N tasks\n"
+            << "    tasksh> thisweek [N]     Schedule for thisweek session, with optional cutoff after N tasks\n"
             << "    tasksh> exec ls -al      Any shell command.  May also use '!ls -al'\n"
             << "    tasksh> help             Tasksh help\n"
             << "    tasksh> diagnostics      Tasksh diagnostics\n"
